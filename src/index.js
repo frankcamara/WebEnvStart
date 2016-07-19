@@ -2,8 +2,8 @@
 var d3 = require('d3');
 
 // Global setup
-var margin = {top: 20, right: 30, bottom: 30, left: 40};
-var width = 960 - margin.left - margin.right;
+var margin = {top: 20, right: 60, bottom: 30, left: 40};
+var width = 860 - margin.left - margin.right;
 var height = 500 - margin.top - margin.bottom;
 var dragTreshold = 5;
 var stepValue;
@@ -29,14 +29,15 @@ function getCallbacks () {
   return {
     onClick: function () {
       console.log('click');
-      this.style.fill = 'green';
+      //this.style.fill = 'green';
     },
 
     onDragStart: function (d, i) {
       // Hold current drag item
       window.rect = d3.select('[data-id=rect-' + i + ']');
-      window.upperTxt = d3.select('[data-id=rectTextUpper-' + i + ']')
+      window.upperTxt = d3.select('[data-id=rectTextUpper-' + i + ']');
       window.lowerTxt = d3.select('[data-id=rectTextLower-' + i + ']');
+      window.stateTxt = d3.select('[data-id=rectTextState-' + i + ']');
       window.rectHeight = parseInt(window.rect.attr('height'));
       window.textPadding = Math.abs(d.upperLimit - d.lowerLimit);
       // Hold mouseposition to later know if we have clicked or moved
@@ -54,6 +55,7 @@ function getCallbacks () {
 
       window.upperTxt.attr('y', rectY);
       window.lowerTxt.attr('y', rectY + window.rectHeight - window.textPadding);
+      window.stateTxt.attr('y', rectY + window.rectHeight/2);
     },
 
     onDragEnd: function (d) {
@@ -79,6 +81,26 @@ function mapYToStep (y) {
   return parseInt(100 - y / stepValue);
 }
 
+function mapNameToColor (name) {
+  switch (name) {
+  case 'Open': {
+    return 'green';
+  }
+  case 'Closed': {
+    return 'red';
+  }
+  case 'Shorted': {
+    return 'gray';
+  }
+  case 'Cut': {
+    return 'black';
+  }
+  default: {
+    return 'steelblue';
+  }
+  }
+}
+
 function App () {
   // Get app callbacks object
   var callbacks = getCallbacks();
@@ -91,10 +113,16 @@ function App () {
   stepValue = height / maxValue;
 
   // Axis setup
+  // X-axis line
   var x = d3.scaleBand()
     .rangeRound([0, width])
-    .padding(0.1)
-    .domain(data.triggers.map(function (d) { return d.name; }));
+    .padding(0.1);
+
+  // X axis bound to name
+  // var x = d3.scaleBand()
+  //   .rangeRound([0, width])
+  //   .padding(0.1)
+  //   .domain(data.triggers.map(function (d) { return d.name; }));
 
   var y = d3.scaleLinear()
     .range([height, 0])
@@ -112,46 +140,99 @@ function App () {
 
   container.append('g')
     .attr('class', 'x axis')
-    .attr('transform', 'translate(0,' + (height) + ')')
+    .attr('transform', 'translate(' + margin.left + ',' + height + ')')
     .call(xAxis);
 
   container.append('g')
     .attr('class', 'y axis')
+    .attr('transform', 'translate('+margin.left+',0)')
     .call(yAxis);
 
   // Content svg
   var content = container.selectAll('.bar')
     .data(data.triggers)
     .enter()
-    .append('g');
+    .append('g')
+    .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
 
   // Rects
+  // Rect with width according to its bandwidth
+  // content.append('rect')
+  // .attr('data-id', function (d, i) { return 'rect-' + i; })
+  // .attr('class', 'rect')
+  // .attr('x', function (d) { return x(d.name); })
+  // .attr('y', function (d) { return y(Math.max(d.lowerLimit, d.upperLimit)); })
+  // .attr('height', function (d) { return Math.abs(y(d.upperLimit) - y(d.lowerLimit)); })
+  // .attr('width', x.bandwidth())
+  // .on('click', callbacks.onClick)
+  // .call(dragEvts);
+
+  // content.append('text')
+  // .attr('data-id', function (d, i) { return 'rectTextUpper-' + i; })
+  // .attr('class', 'rect-text')
+  // .attr('x', function (d) { return x(d.name) + (x.bandwidth()/2); })
+  // .attr('y', function (d) { return y(Math.max(d.lowerLimit, d.upperLimit)); })
+  // .attr('dy', '.75em')
+  // .text(function (d) { return d.upperLimit; });
+  //
+  // content.append('text')
+  // .attr('data-id', function (d, i) { return 'rectTextLower-' + i; })
+  // .attr('class', 'rect-text')
+  // .attr('x', function (d) { return x(d.name) + (x.bandwidth()/2); })
+  // .attr('y', function (d) {
+  //   return y(Math.min(d.lowerLimit, d.upperLimit)) - Math.abs(d.upperLimit - d.lowerLimit); })
+  // .attr('dy', '.75em')
+  // .text(function (d) { return d.lowerLimit; });
+
+  // Rect with full container width
   content.append('rect')
   .attr('data-id', function (d, i) { return 'rect-' + i; })
   .attr('class', 'rect')
-  .attr('x', function (d) { return x(d.name); })
   .attr('y', function (d) { return y(Math.max(d.lowerLimit, d.upperLimit)); })
   .attr('height', function (d) { return Math.abs(y(d.upperLimit) - y(d.lowerLimit)); })
-  .attr('width', x.bandwidth())
+  .attr('width', width)
+  .attr('fill', function (d) { return mapNameToColor(d.name) })
   .on('click', callbacks.onClick)
   .call(dragEvts);
 
   content.append('text')
   .attr('data-id', function (d, i) { return 'rectTextUpper-' + i; })
+  .attr('class', 'text')
   .attr('class', 'rect-text')
-  .attr('x', function (d) { return x(d.name) + (x.bandwidth()/2); })
+  .attr('x', margin.left)
   .attr('y', function (d) { return y(Math.max(d.lowerLimit, d.upperLimit)); })
   .attr('dy', '.75em')
   .text(function (d) { return d.upperLimit; });
 
   content.append('text')
   .attr('data-id', function (d, i) { return 'rectTextLower-' + i; })
+  .attr('class', 'text')
   .attr('class', 'rect-text')
-  .attr('x', function (d) { return x(d.name) + (x.bandwidth()/2); })
+  .attr('x', margin.left)
   .attr('y', function (d) {
-    return y(Math.min(d.lowerLimit, d.upperLimit)) - Math.abs(d.upperLimit - d.lowerLimit); })
+    var diff = Math.abs(d.upperLimit - d.lowerLimit);
+    return y(Math.min(d.lowerLimit, d.upperLimit)) - diff; })
   .attr('dy', '.75em')
   .text(function (d) { return d.lowerLimit; });
+
+  content.append('text')
+  .attr('data-id', function (d, i) { return 'rectTextState-' + i; })
+  .attr('class', 'text')
+  .attr('class', 'rect-text-state')
+  .attr('x', width / 2)
+  .attr('y', function (d) {
+    var middle = Math.abs(y(d.upperLimit) - y(d.lowerLimit))/2;
+    return y(Math.min(d.lowerLimit, d.upperLimit)) - middle; })
+  .attr('dy', '.75em')
+  .text(function (d) { return d.name; });
+
+  // X-axis label
+  content.append('text')
+  .attr('class', 'text')
+  .attr('class', 'label-text')
+  .attr('transform',
+    'translate('+ (-margin.left) +','+(height/2)+')rotate(-90)')
+  .text('Range (mV)');
 }
 
 new App();
